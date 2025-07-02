@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useRouter } from 'next/navigation';
+import axios, { AxiosError } from 'axios';
 
 interface User {
   id: number;
@@ -10,6 +9,7 @@ interface User {
   email: string;
   createdAt: string;
   updatedAt: string;
+  password?: string;
 }
 
 export default function AdminPage() {
@@ -20,25 +20,25 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '' });
   const [editUser, setEditUser] = useState<User | null>(null);
-  const router = useRouter();
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     try {
-      const response = await axios.post('http://localhost:3000/auth/login', {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
         email: email.trim().toLowerCase(),
         password,
       });
       localStorage.setItem('token', response.data.access_token);
-      const usersResponse = await axios.get('http://localhost:3000/auth/users', {
+      const usersResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/users`, {
         headers: { Authorization: `Bearer ${response.data.access_token}` },
       });
       setUsers(usersResponse.data);
       setIsAdminLoggedIn(true);
-    } catch (err: any) {
-      console.error('Admin login error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Failed to log in or fetch user data. Please ensure backend is running.');
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message?: string }>;
+      console.error('Admin login error:', error.response?.data || error.message);
+      setError(error.response?.data?.message || 'Failed to log in or fetch user data. Please ensure backend is running.');
     }
   };
 
@@ -46,15 +46,16 @@ export default function AdminPage() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:3000/auth/users', newUser, {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/users`, newUser, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers([...users, response.data]);
       setNewUser({ name: '', email: '', password: '' });
       setError('');
-    } catch (err: any) {
-      console.error('Create user error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Failed to create user.');
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message?: string }>;
+      console.error('Create user error:', error.response?.data || error.message);
+      setError(error.response?.data?.message || 'Failed to create user.');
     }
   };
 
@@ -63,34 +64,39 @@ export default function AdminPage() {
     if (!editUser) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.put(`http://localhost:3000/auth/users/${editUser.id}`, {
+      const updateData: { name: string; email: string; password?: string } = {
         name: editUser.name,
         email: editUser.email,
-        password: editUser.password || 'defaultPassword123', // Ensure password is provided
-      }, {
+      };
+      if (editUser.password) {
+        updateData.password = editUser.password;
+      }
+      const response = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/auth/users/${editUser.id}`, updateData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(users.map((user) => (user.id === editUser.id ? response.data : user)));
       setEditUser(null);
       setError('');
-    } catch (err: any) {
-      console.error('Update user error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Failed to update user.');
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message?: string }>;
+      console.error('Update user error:', error.response?.data || error.message);
+      setError(error.response?.data?.message || 'Failed to update user.');
     }
   };
 
   const handleDeleteUser = async (id: number, email: string) => {
-    if (email === 'admin@gmail.com') return; // Prevent action on admin
+    if (email === 'admin@gmail.com') return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3000/auth/users/${id}`, {
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/auth/users/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(users.filter((user) => user.id !== id));
       setError('');
-    } catch (err: any) {
-      console.error('Delete user error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Failed to delete user.');
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message?: string }>;
+      console.error('Delete user error:', error.response?.data || error.message);
+      setError(error.response?.data?.message || 'Failed to delete user.');
     }
   };
 
@@ -99,12 +105,13 @@ export default function AdminPage() {
     if (token && isAdminLoggedIn) {
       const fetchUsers = async () => {
         try {
-          const response = await axios.get('http://localhost:3000/auth/users', {
+          const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/users`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           setUsers(response.data);
-        } catch (err: any) {
-          console.error('Fetch users error:', err.response?.data || err.message);
+        } catch (err: unknown) {
+          const error = err as AxiosError<{ message?: string }>;
+          console.error('Fetch users error:', error.response?.data || error.message);
           setIsAdminLoggedIn(false);
           setError('Session expired. Please log in again.');
         }
@@ -232,7 +239,7 @@ export default function AdminPage() {
               />
             </div>
             <div>
-              <label htmlFor="edit-password" className="block text-sm font-medium text-gray-700">Password</label>
+              <label htmlFor="edit-password" className="block text-sm font-medium text-gray-700">Password (optional)</label>
               <input
                 type="password"
                 id="edit-password"

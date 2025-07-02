@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
@@ -11,20 +11,21 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
-      const response = await axios.post('http://localhost:3000/auth/register', {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
         name,
         email: email.trim().toLowerCase(),
         password,
       });
       localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('userId', response.data.user.id.toString());
       router.push('/dashboard');
-    } catch (err: any) {
-      console.error('Registration error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message?: string }>;
+      console.error('Register error:', error.response?.data || error.message);
+      setError(error.response?.data?.message || 'Failed to register. Please try again.');
     }
   };
 
@@ -32,7 +33,7 @@ export default function RegisterPage() {
     <div className="max-w-md mx-auto mt-10 bg-white p-8 rounded-lg shadow-lg">
       <h2 className="text-2xl font-bold mb-6 text-center">Register</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleRegister}>
         <div className="mb-4">
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
           <input
@@ -74,8 +75,7 @@ export default function RegisterPage() {
         </button>
       </form>
       <p className="mt-4 text-center">
-        Already have an account?{' '}
-        <a href="/login" className="text-blue-600 hover:underline">Login</a>
+        Already have an account? <a href="/login" className="text-blue-600 hover:underline">Login</a>
       </p>
     </div>
   );

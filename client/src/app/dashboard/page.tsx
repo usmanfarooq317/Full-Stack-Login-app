@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
 
 interface User {
@@ -18,32 +18,29 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userId = localStorage.getItem('userId');
-    if (!token || !userId) {
-      router.push('/login');
-      return;
-    }
-
     const fetchUser = async () => {
       try {
-        const response = await axios.get(`http://localhost:3000/auth/users/${userId}`, {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          router.push('/login');
+          return;
+        }
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/users`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setUser(response.data);
-      } catch (err) {
-        setError('Failed to fetch user data');
-        localStorage.removeItem('token');
-        localStorage.removeItem('userId');
+        setUser(response.data[0]); // Assuming single user for simplicity
+      } catch (error: unknown) {
+        const axiosError = error as AxiosError<{ message?: string }>;
+        console.error('Fetch user error:', axiosError.response?.data || axiosError.message);
+        setError('Failed to fetch user data. Please log in again.');
         router.push('/login');
       }
     };
-
     fetchUser();
   }, [router]);
 
   if (!user) {
-    return <div>Loading...</div>;
+    return <div className="text-center mt-10">Loading...</div>;
   }
 
   return (
@@ -57,7 +54,6 @@ export default function DashboardPage() {
       <button
         onClick={() => {
           localStorage.removeItem('token');
-          localStorage.removeItem('userId');
           router.push('/login');
         }}
         className="mt-6 w-full bg-red-600 text-white py-2 rounded-md hover:bg-red-700 transition"
